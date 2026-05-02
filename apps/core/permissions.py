@@ -21,3 +21,68 @@ class IsProvider(HasRole):
 
 class IsClient(HasRole):
     allowed_roles = {"client"}
+
+
+class IsAdminOrAuthenticatedReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        if getattr(user, "role", None) == "admin":
+            return True
+
+        return request.method in ("GET", "HEAD", "OPTIONS")
+
+
+class AvailabilitySlotAccess(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        role = getattr(user, "role", None)
+        if role == "admin":
+            return True
+        if role == "provider":
+            return request.method in ("GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE")
+        return request.method in ("GET", "HEAD", "OPTIONS")
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        role = getattr(user, "role", None)
+        if role == "admin":
+            return True
+
+        provider = getattr(obj, "provider", None)
+        if role == "provider" and provider and provider.user_id == user.id:
+            return True
+
+        return request.method in ("GET", "HEAD", "OPTIONS")
+
+
+class BookingRoleAccess(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        role = getattr(user, "role", None)
+        if role == "admin":
+            return True
+        if role == "provider":
+            return request.method in ("GET", "HEAD", "OPTIONS")
+        if role == "client":
+            return request.method in ("GET", "HEAD", "OPTIONS", "POST")
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        role = getattr(user, "role", None)
+        if role == "admin":
+            return True
+        if role == "provider" and getattr(obj, "provider", None) and obj.provider.user_id == user.id:
+            return request.method in ("GET", "HEAD", "OPTIONS")
+        if role == "client" and getattr(obj, "client_id", None) == user.id:
+            return request.method in ("GET", "HEAD", "OPTIONS")
+        return False

@@ -11,6 +11,20 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        provider = attrs.get("provider")
+        service = attrs.get("service")
+        start_time = attrs.get("start_time")
+        end_time = attrs.get("end_time")
+
+        if service and provider and service.provider_id != provider.id:
+            raise serializers.ValidationError("Selected service does not belong to provider.")
+
+        if start_time and end_time and end_time <= start_time:
+            raise serializers.ValidationError("end_time must be after start_time.")
+
+        return attrs
+
     class Meta:
         model = Booking
         fields = [
