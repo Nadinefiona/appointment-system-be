@@ -4,12 +4,14 @@ from rest_framework.viewsets import ModelViewSet
 from .models import AvailabilitySlot, Booking
 from .serializers import AvailabilitySlotSerializer, BookingSerializer
 from .services import create_booking
+from apps.core.permissions import IsAdmin
+from rest_framework.exceptions import PermissionDenied
 
 
 class AvailabilitySlotViewSet(ModelViewSet):
     queryset = AvailabilitySlot.objects.select_related('provider', 'provider__user').all()
     serializer_class = AvailabilitySlotSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdmin]
 
 
 class BookingViewSet(ModelViewSet):
@@ -26,6 +28,9 @@ class BookingViewSet(ModelViewSet):
         return self.queryset.filter(client=user)
 
     def perform_create(self, serializer):
+        user = self.request.user
+        if user.role != "client":
+            raise PermissionDenied("Only clients can create bookings")
         booking = create_booking(
             client=self.request.user,
             provider=serializer.validated_data['provider'],
