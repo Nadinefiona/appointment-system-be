@@ -1,0 +1,17 @@
+from django.urls import path
+from rest_framework.routers import DefaultRouter
+
+from apps.bookings.views import AvailabilitySlotViewSet, BookingViewSet
+from apps.core.views import MeView
+from apps.providers.views import ServiceProviderViewSet
+from apps.services.views import ServiceTypeViewSet
+
+router = DefaultRouter()
+router.register("providers", ServiceProviderViewSet, basename="provider")
+router.register("services", ServiceTypeViewSet, basename="service")
+router.register("availability-slots", AvailabilitySlotViewSet, basename="availability-slot")
+router.register("bookings", BookingViewSet, basename="booking")
+
+urlpatterns = [
+    path("me/", MeView.as_view(), name="me"),
+] + router.urls
