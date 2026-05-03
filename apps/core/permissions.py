@@ -71,8 +71,12 @@ class BookingRoleAccess(BasePermission):
         if role == "admin":
             return True
         if role == "provider":
+            if request.method == "POST" and getattr(view, "action", None) == "cancel":
+                return True
             return request.method in ("GET", "HEAD", "OPTIONS")
         if role == "client":
+            if request.method == "POST" and getattr(view, "action", None) == "cancel":
+                return True
             return request.method in ("GET", "HEAD", "OPTIONS", "POST")
         return False
 
@@ -81,6 +85,15 @@ class BookingRoleAccess(BasePermission):
         role = getattr(user, "role", None)
         if role == "admin":
             return True
+
+        action = getattr(view, "action", None)
+        if action == "cancel" and request.method == "POST":
+            if role == "provider" and getattr(obj, "provider", None) and obj.provider.user_id == user.id:
+                return True
+            if role == "client" and getattr(obj, "client_id", None) == user.id:
+                return True
+            return False
+
         if role == "provider" and getattr(obj, "provider", None) and obj.provider.user_id == user.id:
             return request.method in ("GET", "HEAD", "OPTIONS")
         if role == "client" and getattr(obj, "client_id", None) == user.id:

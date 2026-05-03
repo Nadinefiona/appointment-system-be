@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 
 from apps.accounts.models import User
@@ -6,6 +8,7 @@ from apps.services.models import ServiceType
 
 
 class AvailabilitySlot(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     provider = models.ForeignKey(
         ServiceProvider,
         on_delete=models.CASCADE,
@@ -28,6 +31,7 @@ class AvailabilitySlot(models.Model):
 
 
 class Booking(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     STATUS_BOOKED = "booked"
     STATUS_CANCELLED = "cancelled"
     STATUS_COMPLETED = "completed"
@@ -54,7 +58,8 @@ class Booking(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["provider", "start_time"],
-                name="unique_booking_per_slot",
+                condition=models.Q(status="booked"),
+                name="unique_booked_start_per_provider",
             ),
             models.CheckConstraint(
                 check=models.Q(end_time__gt=models.F("start_time")),

@@ -1,9 +1,11 @@
+from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .models import AvailabilitySlot, Booking
 from .serializers import AvailabilitySlotSerializer, BookingSerializer
-from .services import create_booking
+from .services import cancel_booking, create_booking
 from apps.core.permissions import AvailabilitySlotAccess, BookingRoleAccess
 
 
@@ -57,9 +59,18 @@ class BookingViewSet(ModelViewSet):
                 provider=serializer.validated_data["provider"],
                 service=serializer.validated_data["service"],
                 start_time=serializer.validated_data["start_time"],
-                end_time=serializer.validated_data["end_time"],
+                end_time=serializer.validated_data.get("end_time"),
             )
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
 
         serializer.instance = booking
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        booking = self.get_object()
+        try:
+            cancel_booking(booking=booking, actor=request.user)
+        except ValueError as exc:
+            raise ValidationError(str(exc)) from exc
+        return Response(self.get_serializer(booking).data)

@@ -4,6 +4,8 @@ from .models import AvailabilitySlot, Booking
 
 
 class AvailabilitySlotSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
     class Meta:
         model = AvailabilitySlot
         fields = ["id", "provider", "weekday", "start_time", "end_time"]
@@ -11,6 +13,8 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
     def validate(self, attrs):
         provider = attrs.get("provider")
         service = attrs.get("service")
@@ -38,3 +42,4 @@ class BookingSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = ["id", "client", "created_at"]
+        extra_kwargs = {"end_time": {"required": False}}
