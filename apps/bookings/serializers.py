@@ -8,8 +8,16 @@ class AvailabilitySlotSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = AvailabilitySlot
-        fields = ["id", "provider", "weekday", "start_time", "end_time"]
+        fields = ["id", "provider", "weekday", "start_time", "end_time", "valid_from", "valid_to"]
         read_only_fields = ["id"]
+
+
+class BookingSummarySerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = Booking
+        fields = ["id", "start_time", "end_time", "status", "service", "client"]
 
 
 class BookingSerializer(serializers.ModelSerializer):

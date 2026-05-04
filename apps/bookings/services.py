@@ -16,11 +16,16 @@ def _service_duration_end(*, start_at, service):
 def _fits_availability(*, provider, start_at, end_at):
     local = timezone.localtime(start_at)
     weekday = local.weekday()
+    local_date = local.date()
     start_t = local.time()
     end_t = timezone.localtime(end_at).time()
 
     slots = AvailabilitySlot.objects.filter(provider=provider, weekday=weekday)
     for slot in slots:
+        if slot.valid_from and local_date < slot.valid_from:
+            continue
+        if slot.valid_to and local_date > slot.valid_to:
+            continue
         if slot.start_time <= start_t and slot.end_time >= end_t:
             return True
     return False
