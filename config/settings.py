@@ -143,6 +143,11 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
+    "DEFAULT_FILTER_BACKENDS": (
+        "rest_framework.filters.OrderingFilter",
+        "rest_framework.filters.SearchFilter",
+    ),
 }
 
 SIMPLE_JWT = {

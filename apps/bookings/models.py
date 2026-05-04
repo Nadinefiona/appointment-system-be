@@ -17,12 +17,20 @@ class AvailabilitySlot(models.Model):
     weekday = models.IntegerField(help_text="0=Monday, 6=Sunday")
     start_time = models.TimeField()
     end_time = models.TimeField()
+    valid_from = models.DateField(null=True, blank=True)
+    valid_to = models.DateField(null=True, blank=True)
 
     class Meta:
         constraints = [
             models.CheckConstraint(
                 check=models.Q(end_time__gt=models.F("start_time")),
                 name="availability_end_after_start",
+            ),
+            models.CheckConstraint(
+                check=models.Q(valid_to__gte=models.F("valid_from"))
+                | models.Q(valid_to__isnull=True)
+                | models.Q(valid_from__isnull=True),
+                name="availability_valid_to_after_valid_from",
             ),
         ]
 
