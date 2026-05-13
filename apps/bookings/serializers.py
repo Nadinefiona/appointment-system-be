@@ -6,6 +6,11 @@ from .models import AvailabilitySlot, Booking
 class AvailabilitySlotSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
 
+    def validate(self, attrs):
+        if self.instance is not None and "provider" in attrs and attrs["provider"] != self.instance.provider:
+            raise serializers.ValidationError({"provider": "Cannot move this slot to another provider."})
+        return attrs
+
     class Meta:
         model = AvailabilitySlot
         fields = ["id", "provider", "weekday", "start_time", "end_time", "valid_from", "valid_to"]

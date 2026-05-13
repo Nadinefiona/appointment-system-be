@@ -21,8 +21,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-jmomq-_xp1t$^o(hd(vla57hv4f-u&2au@7ewc1hq8fttrw6-x'
+_secret_key = (config("SECRET_KEY", default="") or "").strip()
+SECRET_KEY = _secret_key or "django-insecure-dev-only-set-a-real-secret-key-for-production"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
+    'drf_spectacular',
     'apps.accounts.apps.AccountsConfig',
     'apps.providers.apps.ProvidersConfig',
     'apps.services.apps.ServicesConfig',
@@ -143,6 +144,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
     "DEFAULT_FILTER_BACKENDS": (
         "rest_framework.filters.OrderingFilter",
@@ -153,4 +155,50 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Appointment System API",
+    "DESCRIPTION": (
+        "REST API for booking appointments: JWT auth, role-based access (admin / provider / client), "
+        "availability, services, bookings, and schedule helpers. "
+        "Use **Authorize** in Swagger with `Bearer <access_token>` after logging in via **Authentication**."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+        "displayRequestDuration": True,
+    },
+    "TAGS": [
+        {
+            "name": "Authentication",
+            "description": "Obtain and refresh JWT access tokens (login for the API).",
+        },
+        {
+            "name": "Registration",
+            "description": "Public sign-up for new accounts (e.g. self-service provider registration).",
+        },
+        {
+            "name": "Account",
+            "description": "Current user (`/me/`) and provider self-profile (`/me/provider-profile/`).",
+        },
+        {
+            "name": "Providers",
+            "description": "Provider directory, detailed schedule (provider/admin), and day openings for booking.",
+        },
+        {
+            "name": "Services",
+            "description": "Services offered by each provider (name, duration, price).",
+        },
+        {
+            "name": "Availability",
+            "description": "Recurring weekly slots (and optional date range) that constrain when bookings are allowed.",
+        },
+        {
+            "name": "Bookings",
+            "description": "Create appointments (clients), list by role, and cancel when allowed.",
+        },
+    ],
 }

@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.utils.dateparse import parse_datetime
@@ -12,8 +13,29 @@ from .models import AvailabilitySlot, Booking
 from .serializers import AvailabilitySlotSerializer, BookingSerializer
 from .services import cancel_booking, create_booking
 from apps.core.permissions import AvailabilitySlotAccess, BookingRoleAccess
+from apps.providers.models import ServiceProvider
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Availability"],
+        summary="List availability slots",
+        description=(
+            "Providers see **their** slots only; admins see all. "
+            "Query: `weekday`, `active_on`, `ordering`. "
+            "Providers create slots without sending `provider` (server assigns their profile)."
+        ),
+    ),
+    retrieve=extend_schema(tags=["Availability"], summary="Get slot"),
+    create=extend_schema(
+        tags=["Availability"],
+        summary="Create availability slot",
+        description="**Provider**: omit `provider` in body. **Admin**: include `provider` id.",
+    ),
+    update=extend_schema(tags=["Availability"], summary="Replace slot"),
+    partial_update=extend_schema(tags=["Availability"], summary="Patch slot"),
+    destroy=extend_schema(tags=["Availability"], summary="Delete slot"),
+)
 class AvailabilitySlotViewSet(ModelViewSet):
     queryset = AvailabilitySlot.objects.select_related("provider", "provider__user").all()
     serializer_class = AvailabilitySlotSerializer
@@ -50,15 +72,40 @@ class AvailabilitySlotViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if getattr(user, "role", None) != "provider":
-            raise PermissionDenied("Only providers can create availability slots.")
+        role = getattr(user, "role", None)
+        if role == "provider":
+            provider = ServiceProvider.objects.filter(user=user).first()
+            if provider is None:
+                raise PermissionDenied("Create a provider profile before adding availability.")
+            serializer.save(provider=provider)
+            return
+        if role == "admin":
+            if "provider" not in serializer.validated_data:
+                raise ValidationError({"provider": "This field is required."})
+            serializer.save()
+            return
+        raise PermissionDenied("Only providers or administrators can create availability slots.")
 
-        provider = serializer.validated_data["provider"]
-        if provider.user_id != user.id:
-            raise PermissionDenied("You can only manage your own availability.")
-        serializer.save()
+    def perform_update(self, serializer):
+        if getattr(self.request.user, "role", None) == "admin":
+            serializer.save()
+        else:
+            serializer.save(provider=serializer.instance.provider)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=["Bookings"],
+        summary="List bookings",
+        description="Scoped by role: **client** own, **provider** for their business, **admin** all. Filters: `status`, `from`, `to`, `ordering`.",
+    ),
+    retrieve=extend_schema(tags=["Bookings"], summary="Get booking"),
+    create=extend_schema(
+        tags=["Bookings"],
+        summary="Create booking (client)",
+        description="**Client only**. Validates availability, duration, buffer overlap, and atomic conflict rules.",
+    ),
+)
 class BookingViewSet(ModelViewSet):
     queryset = Booking.objects.select_related("client", "provider", "service").all()
     serializer_class = BookingSerializer
@@ -119,6 +166,14 @@ class BookingViewSet(ModelViewSet):
 
         serializer.instance = booking
 
+    @extend_schema(
+        tags=["Bookings"],
+        summary="Cancel booking",
+        description=(
+            "**Client** (own booking), **provider** (their provider’s booking), or **admin**. "
+            "Only **booked** rows can be cancelled; slot becomes bookable again."
+        ),
+    )
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         booking = self.get_object()
