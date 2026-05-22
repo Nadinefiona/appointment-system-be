@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'drf_spectacular',
+    'corsheaders',
     'apps.accounts.apps.AccountsConfig',
     'apps.providers.apps.ProvidersConfig',
     'apps.services.apps.ServicesConfig',
@@ -51,6 +52,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -178,7 +180,7 @@ SPECTACULAR_SETTINGS = {
         },
         {
             "name": "Registration",
-            "description": "Public sign-up for new accounts (e.g. self-service provider registration).",
+            "description": "Public client sign-up. Admins promote users to provider via Django admin.",
         },
         {
             "name": "Account",
@@ -202,3 +204,27 @@ SPECTACULAR_SETTINGS = {
         },
     ],
 }
+
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://127.0.0.1:3000",
+    cast=lambda v: [o.strip() for o in v.split(",") if o.strip()],
+)
+CORS_ALLOW_CREDENTIALS = True
+
+EMAIL_NOTIFICATIONS_ENABLED = config("EMAIL_NOTIFICATIONS_ENABLED", default=True, cast=bool)
+EMAIL_BACKEND = config(
+    "EMAIL_BACKEND",
+    default="django.core.mail.backends.console.EmailBackend",
+)
+EMAIL_HOST = config("EMAIL_HOST", default="localhost")
+EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@appointments.local")
+EMAIL_FAIL_SILENTLY = config("EMAIL_FAIL_SILENTLY", default=False, cast=bool)
+
+BOOKING_REMINDER_HOURS = config("BOOKING_REMINDER_HOURS", default=24, cast=int)
+BOOKING_REMINDER_WINDOW_MINUTES = config("BOOKING_REMINDER_WINDOW_MINUTES", default=30, cast=int)

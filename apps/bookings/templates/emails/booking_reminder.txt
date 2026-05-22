@@ -1,0 +1,10 @@
+Hello {{ client_name }},
+
+This is a reminder for your upcoming appointment.
+
+Service: {{ service_name }}
+Provider: {{ provider_name }}
+When: {{ start_time }} – {{ end_time }}
+Booking ID: {{ booking_id }}
+
+— Appointment System

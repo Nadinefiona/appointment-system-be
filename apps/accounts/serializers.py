@@ -1,8 +1,6 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from apps.providers.models import ServiceProvider
-
 from .models import User
 
 
@@ -15,13 +13,24 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id"]
 
 
-class RegisterProviderSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=150)
+def username_from_email(email: str) -> str:
+    """Derive a unique username from an email address."""
+    base = email.split("@", 1)[0][:150] or "user"
+    candidate = base
+    suffix = 1
+    while User.objects.filter(username__iexact=candidate).exists():
+        tail = f"_{suffix}"
+        candidate = f"{base[: 150 - len(tail)]}{tail}"
+        suffix += 1
+    return candidate
+
+
+class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
     password_confirm = serializers.CharField(write_only=True, min_length=8)
-    bio = serializers.CharField(required=False, allow_blank=True, default="")
-    buffer_time = serializers.IntegerField(required=False, default=0, min_value=0)
+    first_name = serializers.CharField(required=False, allow_blank=True, default="")
+    last_name = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
@@ -29,26 +38,22 @@ class RegisterProviderSerializer(serializers.Serializer):
         validate_password(attrs["password"])
         return attrs
 
-    def validate_username(self, value):
-        if User.objects.filter(username__iexact=value).exists():
-            raise serializers.ValidationError("This username is already taken.")
-        return value
-
     def validate_email(self, value):
+        value = value.strip().lower()
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("This email is already registered.")
-        return value.strip().lower()
+        return value
 
     def create(self, validated_data):
         validated_data.pop("password_confirm", None)
         password = validated_data.pop("password")
-        bio = validated_data.pop("bio", "")
-        buffer_time = validated_data.pop("buffer_time", 0)
+        email = validated_data["email"]
         user = User.objects.create_user(
-            username=validated_data["username"],
-            email=validated_data["email"],
+            username=username_from_email(email),
+            email=email,
             password=password,
-            role=User.ROLE_PROVIDER,
+            first_name=validated_data.get("first_name", ""),
+            last_name=validated_data.get("last_name", ""),
+            role=User.ROLE_CLIENT,
         )
-        ServiceProvider.objects.create(user=user, bio=bio, buffer_time=buffer_time)
         return user

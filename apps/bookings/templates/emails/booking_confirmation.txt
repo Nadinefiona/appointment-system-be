@@ -1,0 +1,12 @@
+Hello {{ client_name }},
+
+Your appointment is confirmed.
+
+Service: {{ service_name }}
+Provider: {{ provider_name }}
+When: {{ start_time }} – {{ end_time }}
+Booking ID: {{ booking_id }}
+
+If you need to change or cancel, use the booking API or contact the provider.
+
+— Appointment System

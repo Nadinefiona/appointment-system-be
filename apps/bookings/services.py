@@ -6,6 +6,7 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 
 from apps.bookings.models import AvailabilitySlot, Booking
+from apps.bookings.notifications import schedule_booking_confirmation
 from apps.providers.models import ServiceProvider
 
 
@@ -66,7 +67,7 @@ def create_booking(*, client, provider, service, start_time, end_time=None):
     if conflicts.exists():
         raise ValueError("Time conflicts with an existing booking.")
 
-    return Booking.objects.create(
+    booking = Booking.objects.create(
         client=client,
         provider=provider,
         service=service,
@@ -74,6 +75,8 @@ def create_booking(*, client, provider, service, start_time, end_time=None):
         end_time=end_time,
         status=Booking.STATUS_BOOKED,
     )
+    schedule_booking_confirmation(booking.pk)
+    return booking
 
 
 @transaction.atomic
