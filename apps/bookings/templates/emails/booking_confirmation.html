@@ -1,10 +1,4 @@
 <p>Hello {{ client_name }},</p>
-<p>Your appointment is <strong>confirmed</strong>.</p>
-<ul>
-  <li><strong>Service:</strong> {{ service_name }}</li>
-  <li><strong>Provider:</strong> {{ provider_name }}</li>
-  <li><strong>When:</strong> {{ start_time }} – {{ end_time }}</li>
-  <li><strong>Booking ID:</strong> {{ booking_id }}</li>
-</ul>
-<p>If you need to change or cancel, use the booking API or contact the provider.</p>
-<p>— Appointment System</p>
+<p>Your appointment is confirmed.</p>
+<p><strong>{{ service_name }}</strong> with {{ provider_name }}<br>{{ when }}</p>
+<p>If you need to cancel, use the app or contact your provider.</p>

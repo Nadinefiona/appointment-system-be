@@ -59,6 +59,7 @@ class Booking(models.Model):
     service = models.ForeignKey(ServiceType, on_delete=models.CASCADE, related_name="bookings")
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
+    note = models.TextField(blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_BOOKED)
     created_at = models.DateTimeField(auto_now_add=True)
     reminder_sent_at = models.DateTimeField(null=True, blank=True)

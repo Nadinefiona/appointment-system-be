@@ -5,7 +5,6 @@ from .models import ServiceType
 
 @admin.register(ServiceType)
 class ServiceTypeAdmin(admin.ModelAdmin):
-    list_display = ("name", "provider", "duration", "price", "id")
-    list_filter = ("provider",)
-    search_fields = ("name", "provider__user__username")
-    raw_id_fields = ("provider",)
+    list_display = ("name", "id")
+    search_fields = ("name", "providers__user__username", "providers__user__email")
+    filter_horizontal = ("providers",)

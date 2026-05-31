@@ -2,11 +2,7 @@ Hello {{ client_name }},
 
 Your appointment is confirmed.
 
-Service: {{ service_name }}
-Provider: {{ provider_name }}
-When: {{ start_time }} – {{ end_time }}
-Booking ID: {{ booking_id }}
+{{ service_name }} with {{ provider_name }}
+{{ when }}
 
-If you need to change or cancel, use the booking API or contact the provider.
-
-— Appointment System
+If you need to cancel, use the app or contact your provider.

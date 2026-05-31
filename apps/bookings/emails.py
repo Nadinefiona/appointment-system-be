@@ -10,20 +10,32 @@ def _notifications_enabled() -> bool:
     return bool(getattr(settings, "EMAIL_NOTIFICATIONS_ENABLED", True))
 
 
+def _format_when(start, end) -> str:
+    start_local = timezone.localtime(start)
+    end_local = timezone.localtime(end)
+    date_part = start_local.strftime("%A, %d %B %Y")
+    start_part = start_local.strftime("%H:%M")
+    end_part = end_local.strftime("%H:%M")
+    return f"{date_part}, {start_part}–{end_part}"
+
+
+def _display_name(user) -> str:
+    name = user.get_full_name().strip()
+    if name:
+        return name
+    return user.email or user.get_username()
+
+
 def _booking_email_context(booking: Booking) -> dict:
     provider_user = booking.provider.user
-    local_start = timezone.localtime(booking.start_time)
-    local_end = timezone.localtime(booking.end_time)
+    when = _format_when(booking.start_time, booking.end_time)
     return {
-        "booking_id": str(booking.id),
-        "client_name": booking.client.get_full_name() or booking.client.get_username(),
+        "client_name": _display_name(booking.client),
         "client_email": booking.client.email,
-        "provider_name": provider_user.get_full_name() or provider_user.get_username(),
+        "provider_name": _display_name(provider_user),
         "provider_email": provider_user.email,
         "service_name": booking.service.name,
-        "start_time": local_start.strftime("%Y-%m-%d %H:%M %Z"),
-        "end_time": local_end.strftime("%Y-%m-%d %H:%M %Z"),
-        "status": booking.status,
+        "when": when,
     }
 
 
@@ -64,8 +76,26 @@ def send_booking_confirmation(booking_id):
     context = _booking_email_context(booking)
     recipients = [booking.client.email, booking.provider.user.email]
     return _send_templated_mail(
-        subject=f"Appointment confirmed — {context['service_name']}",
+        subject=f"Appointment confirmed: {context['service_name']}",
         template_name="booking_confirmation",
+        context=context,
+        recipients=recipients,
+    )
+
+
+def send_booking_cancellation(booking_id):
+    if not _notifications_enabled():
+        return 0
+
+    booking = _get_booking(booking_id)
+    if booking.status != Booking.STATUS_CANCELLED:
+        return 0
+
+    context = _booking_email_context(booking)
+    recipients = [booking.client.email, booking.provider.user.email]
+    return _send_templated_mail(
+        subject=f"Appointment cancelled: {context['service_name']}",
+        template_name="booking_cancellation",
         context=context,
         recipients=recipients,
     )
@@ -84,7 +114,7 @@ def send_booking_reminder(booking_id):
 
     context = _booking_email_context(booking)
     sent = _send_templated_mail(
-        subject=f"Reminder: appointment in {settings.BOOKING_REMINDER_HOURS} hours",
+        subject=f"Reminder: {context['service_name']} on {context['when'].split(',')[0]}",
         template_name="booking_reminder",
         context=context,
         recipients=[booking.client.email],

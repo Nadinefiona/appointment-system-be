@@ -1,6 +1,10 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
+from apps.providers.models import ServiceProvider
+
+from apps.providers.buffer import MAX_BUFFER_MINUTES
+
 from .models import User
 
 
@@ -11,6 +15,81 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "username", "email", "first_name", "last_name", "role"]
         read_only_fields = ["id"]
+
+
+class ProviderProfileSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = ServiceProvider
+        fields = ["id", "bio", "buffer_time"]
+        read_only_fields = ["id"]
+
+    def validate_buffer_time(self, value):
+        if value > MAX_BUFFER_MINUTES:
+            raise serializers.ValidationError(
+                f"Buffer time cannot exceed {MAX_BUFFER_MINUTES} minutes (8 hours)."
+            )
+        return value
+
+
+class MeProfileSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+    role = serializers.CharField(read_only=True)
+    provider_profile = ProviderProfileSerializer(required=False, allow_null=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "username", "email", "first_name", "last_name", "role", "provider_profile"]
+        read_only_fields = ["id", "username", "role"]
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+        user = self.instance
+        qs = User.objects.filter(email__iexact=value)
+        if user:
+            qs = qs.exclude(pk=user.pk)
+        if qs.exists():
+            raise serializers.ValidationError("This email is already in use.")
+        return value
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        profile = ServiceProvider.objects.filter(user=instance).first()
+        data["provider_profile"] = (
+            ProviderProfileSerializer(profile).data if profile else None
+        )
+        return data
+
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop("provider_profile", None)
+        instance = super().update(instance, validated_data)
+        if profile_data is None:
+            return instance
+        if instance.role != User.ROLE_PROVIDER:
+            raise serializers.ValidationError(
+                {"provider_profile": "Only provider accounts have a provider profile."}
+            )
+        profile, _ = ServiceProvider.objects.get_or_create(user=instance)
+        profile_serializer = ProviderProfileSerializer(profile, data=profile_data, partial=True)
+        profile_serializer.is_valid(raise_exception=True)
+        profile_serializer.save()
+        return instance
+
+
+class AdminUserListSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "username", "first_name", "last_name", "role"]
+        read_only_fields = fields
+
+
+class AdminUserRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["role"]
 
 
 def username_from_email(email: str) -> str:

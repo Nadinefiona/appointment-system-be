@@ -3,20 +3,13 @@ from rest_framework import generics, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 
+from apps.core.openapi import REGISTER
+
 from .serializers import RegisterSerializer
 
 
 @extend_schema_view(
-    post=extend_schema(
-        tags=["Registration"],
-        summary="Register as client",
-        description=(
-            "Creates a **client** account (default role). "
-            "No authentication required. "
-            "An admin can later change the user's role to **provider** in Django admin. "
-            "Then obtain a JWT at POST /api/token/ using **email** and **password**."
-        ),
-    )
+    post=extend_schema(tags=["Registration"], summary=REGISTER),
 )
 class RegisterView(generics.CreateAPIView):
     permission_classes = [AllowAny]

@@ -1,9 +1,3 @@
 <p>Hello {{ client_name }},</p>
-<p>This is a reminder for your <strong>upcoming</strong> appointment.</p>
-<ul>
-  <li><strong>Service:</strong> {{ service_name }}</li>
-  <li><strong>Provider:</strong> {{ provider_name }}</li>
-  <li><strong>When:</strong> {{ start_time }} – {{ end_time }}</li>
-  <li><strong>Booking ID:</strong> {{ booking_id }}</li>
-</ul>
-<p>— Appointment System</p>
+<p>Reminder: your appointment is coming up.</p>
+<p><strong>{{ service_name }}</strong> with {{ provider_name }}<br>{{ when }}</p>

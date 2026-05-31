@@ -1,40 +1,42 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.utils import timezone
-from django.utils.dateparse import parse_date
 from django.utils.dateparse import parse_datetime
-from django.db.models import Q
-from rest_framework import filters
+from rest_framework import filters, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .models import AvailabilitySlot, Booking
-from .serializers import AvailabilitySlotSerializer, BookingSerializer
+from .serializers import (
+    AvailabilitySlotSerializer,
+    BookingCreateSerializer,
+    BookingSerializer,
+)
 from .services import cancel_booking, create_booking
+from apps.core.openapi import (
+    AVAIL_CREATE,
+    AVAIL_DELETE,
+    AVAIL_GET,
+    AVAIL_LIST,
+    AVAIL_PATCH,
+    AVAIL_UPDATE,
+    BOOKINGS_CANCEL,
+    BOOKINGS_CREATE,
+    BOOKINGS_GET,
+    BOOKINGS_LIST,
+)
 from apps.core.permissions import AvailabilitySlotAccess, BookingRoleAccess
 from apps.providers.models import ServiceProvider
 
 
 @extend_schema_view(
-    list=extend_schema(
-        tags=["Availability"],
-        summary="List availability slots",
-        description=(
-            "Providers see **their** slots only; admins see all. "
-            "Query: `weekday`, `active_on`, `ordering`. "
-            "Providers create slots without sending `provider` (server assigns their profile)."
-        ),
-    ),
-    retrieve=extend_schema(tags=["Availability"], summary="Get slot"),
-    create=extend_schema(
-        tags=["Availability"],
-        summary="Create availability slot",
-        description="**Provider**: omit `provider` in body. **Admin**: include `provider` id.",
-    ),
-    update=extend_schema(tags=["Availability"], summary="Replace slot"),
-    partial_update=extend_schema(tags=["Availability"], summary="Patch slot"),
-    destroy=extend_schema(tags=["Availability"], summary="Delete slot"),
+    list=extend_schema(tags=["Availability"], summary=AVAIL_LIST),
+    retrieve=extend_schema(tags=["Availability"], summary=AVAIL_GET),
+    create=extend_schema(tags=["Availability"], summary=AVAIL_CREATE),
+    update=extend_schema(tags=["Availability"], summary=AVAIL_UPDATE),
+    partial_update=extend_schema(tags=["Availability"], summary=AVAIL_PATCH),
+    destroy=extend_schema(tags=["Availability"], summary=AVAIL_DELETE),
 )
 class AvailabilitySlotViewSet(ModelViewSet):
     queryset = AvailabilitySlot.objects.select_related("provider", "provider__user").all()
@@ -52,6 +54,15 @@ class AvailabilitySlotViewSet(ModelViewSet):
             return self.queryset.filter(provider__user=user)
         return self.queryset.none()
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        user = self.request.user
+        if getattr(user, "role", None) == "provider":
+            provider = ServiceProvider.objects.filter(user=user).first()
+            if provider is not None:
+                context["provider"] = provider
+        return context
+
     def filter_queryset(self, queryset):
         qs = super().filter_queryset(queryset)
         weekday = self.request.query_params.get("weekday")
@@ -60,51 +71,34 @@ class AvailabilitySlotViewSet(ModelViewSet):
         provider_id = self.request.query_params.get("provider")
         if provider_id and getattr(self.request.user, "role", None) == "admin":
             qs = qs.filter(provider_id=provider_id)
-        active_on = self.request.query_params.get("active_on")
-        if active_on:
-            active_date = parse_date(active_on)
-            if active_date:
-                qs = qs.filter(
-                    Q(valid_from__isnull=True) | Q(valid_from__lte=active_date),
-                    Q(valid_to__isnull=True) | Q(valid_to__gte=active_date),
-                )
         return qs
 
     def perform_create(self, serializer):
         user = self.request.user
         role = getattr(user, "role", None)
-        if role == "provider":
-            provider = ServiceProvider.objects.filter(user=user).first()
-            if provider is None:
-                raise PermissionDenied("Create a provider profile before adding availability.")
-            serializer.save(provider=provider)
-            return
-        if role == "admin":
-            if "provider" not in serializer.validated_data:
-                raise ValidationError({"provider": "This field is required."})
-            serializer.save()
-            return
-        raise PermissionDenied("Only providers or administrators can create availability slots.")
+        if role != "provider":
+            raise PermissionDenied("Only providers can create availability slots via the API.")
+
+        provider = ServiceProvider.objects.filter(user=user).first()
+        if provider is None:
+            raise PermissionDenied("Create a provider profile before adding availability.")
+        serializer.save(provider=provider)
 
     def perform_update(self, serializer):
-        if getattr(self.request.user, "role", None) == "admin":
-            serializer.save()
-        else:
+        role = getattr(self.request.user, "role", None)
+        if role == "provider":
             serializer.save(provider=serializer.instance.provider)
+            return
+        if role == "admin":
+            serializer.save()
+            return
+        raise PermissionDenied("Only providers or administrators can update availability slots.")
 
 
 @extend_schema_view(
-    list=extend_schema(
-        tags=["Bookings"],
-        summary="List bookings",
-        description="Scoped by role: **client** own, **provider** for their business, **admin** all. Filters: `status`, `from`, `to`, `ordering`.",
-    ),
-    retrieve=extend_schema(tags=["Bookings"], summary="Get booking"),
-    create=extend_schema(
-        tags=["Bookings"],
-        summary="Create booking (client)",
-        description="**Client only**. Validates availability, duration, buffer overlap, and atomic conflict rules.",
-    ),
+    list=extend_schema(tags=["Bookings"], summary=BOOKINGS_LIST),
+    retrieve=extend_schema(tags=["Bookings"], summary=BOOKINGS_GET),
+    create=extend_schema(tags=["Bookings"], summary=BOOKINGS_CREATE),
 )
 class BookingViewSet(ModelViewSet):
     queryset = Booking.objects.select_related("client", "provider", "service").all()
@@ -114,6 +108,11 @@ class BookingViewSet(ModelViewSet):
     filter_backends = [filters.OrderingFilter]
     ordering_fields = ["start_time", "created_at", "status"]
     ordering = ["-start_time"]
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return BookingCreateSerializer
+        return BookingSerializer
 
     def get_queryset(self):
         user = self.request.user
@@ -149,31 +148,28 @@ class BookingViewSet(ModelViewSet):
             qs = qs.filter(start_time__lt=to_dt)
         return qs
 
-    def perform_create(self, serializer):
-        if getattr(self.request.user, "role", None) != "client":
+    def create(self, request, *args, **kwargs):
+        if getattr(request.user, "role", None) != "client":
             raise PermissionDenied("Only clients can create bookings")
+
+        input_serializer = BookingCreateSerializer(data=request.data)
+        input_serializer.is_valid(raise_exception=True)
 
         try:
             booking = create_booking(
-                client=self.request.user,
-                provider=serializer.validated_data["provider"],
-                service=serializer.validated_data["service"],
-                start_time=serializer.validated_data["start_time"],
-                end_time=serializer.validated_data.get("end_time"),
+                client=request.user,
+                provider=input_serializer.validated_data["provider"],
+                service=input_serializer.validated_data["service"],
+                start_time=input_serializer.validated_data["start_time"],
+                note=input_serializer.validated_data.get("note", ""),
             )
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
 
-        serializer.instance = booking
+        output_serializer = BookingSerializer(booking, context=self.get_serializer_context())
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-    @extend_schema(
-        tags=["Bookings"],
-        summary="Cancel booking",
-        description=(
-            "**Client** (own booking), **provider** (their provider’s booking), or **admin**. "
-            "Only **booked** rows can be cancelled; slot becomes bookable again."
-        ),
-    )
+    @extend_schema(tags=["Bookings"], summary=BOOKINGS_CANCEL)
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         booking = self.get_object()

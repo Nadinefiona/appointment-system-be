@@ -58,3 +58,55 @@ class RegisterAndLoginTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class MeProfileTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            username="client",
+            email="client@example.com",
+            password="securepass123",
+            role=User.ROLE_CLIENT,
+        )
+        self.client.force_authenticate(user=self.user)
+
+    def test_get_profile_client(self):
+        response = self.client.get("/api/me/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["email"], "client@example.com")
+        self.assertIsNone(response.data["provider_profile"])
+
+    def test_patch_profile_client(self):
+        response = self.client.patch(
+            "/api/me/",
+            {"first_name": "Ada", "last_name": "Lovelace"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Ada")
+
+    def test_provider_profile_in_me(self):
+        provider_user = User.objects.create_user(
+            username="provider",
+            email="provider@example.com",
+            password="securepass123",
+            role=User.ROLE_PROVIDER,
+        )
+        profile = ServiceProvider.objects.create(user=provider_user, bio="Hello", buffer_time=10)
+        self.client.force_authenticate(user=provider_user)
+
+        response = self.client.get("/api/me/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["provider_profile"]["bio"], "Hello")
+
+        response = self.client.patch(
+            "/api/me/",
+            {"provider_profile": {"bio": "Updated", "buffer_time": 15}},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        profile.refresh_from_db()
+        self.assertEqual(profile.bio, "Updated")
+        self.assertEqual(profile.buffer_time, 15)

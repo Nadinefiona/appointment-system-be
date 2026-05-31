@@ -12,32 +12,28 @@ from rest_framework.viewsets import ModelViewSet
 from apps.bookings.models import AvailabilitySlot, Booking
 from apps.bookings.openings import day_openings_payload
 from apps.bookings.serializers import AvailabilitySlotSerializer, BookingSummarySerializer
+from apps.core.openapi import (
+    PROVIDERS_CREATE,
+    PROVIDERS_DELETE,
+    PROVIDERS_GET,
+    PROVIDERS_LIST,
+    PROVIDERS_OPENINGS,
+    PROVIDERS_PATCH,
+    PROVIDERS_SCHEDULE,
+    PROVIDERS_UPDATE,
+)
 from apps.core.permissions import IsAdminOrAuthenticatedReadOnly
-from apps.services.models import ServiceType
-
 from .models import ServiceProvider
 from .serializers import ServiceProviderSerializer
 
 
 @extend_schema_view(
-    list=extend_schema(
-        tags=["Providers"],
-        summary="List providers",
-        description="Public catalog for authenticated users. Admins may create new provider records; others are read-only.",
-    ),
-    retrieve=extend_schema(
-        tags=["Providers"],
-        summary="Get provider",
-        description="Fetch one provider by id (linked user, bio, buffer).",
-    ),
-    create=extend_schema(
-        tags=["Providers"],
-        summary="Create provider (admin)",
-        description="Admin-only: create a **ServiceProvider** linked to an existing user.",
-    ),
-    update=extend_schema(tags=["Providers"], summary="Replace provider (admin)"),
-    partial_update=extend_schema(tags=["Providers"], summary="Patch provider (admin)"),
-    destroy=extend_schema(tags=["Providers"], summary="Delete provider (admin)"),
+    list=extend_schema(tags=["Providers"], summary=PROVIDERS_LIST),
+    retrieve=extend_schema(tags=["Providers"], summary=PROVIDERS_GET),
+    create=extend_schema(tags=["Providers"], summary=PROVIDERS_CREATE),
+    update=extend_schema(tags=["Providers"], summary=PROVIDERS_UPDATE),
+    partial_update=extend_schema(tags=["Providers"], summary=PROVIDERS_PATCH),
+    destroy=extend_schema(tags=["Providers"], summary=PROVIDERS_DELETE),
 )
 class ServiceProviderViewSet(ModelViewSet):
     queryset = ServiceProvider.objects.select_related("user").all()
@@ -50,27 +46,10 @@ class ServiceProviderViewSet(ModelViewSet):
 
     @extend_schema(
         tags=["Providers"],
-        summary="Provider schedule in a time range",
-        description=(
-            "Returns recurring **availability** rows plus **booked/completed** bookings in `[from, to)` "
-            "(ISO datetimes). **Provider** may only query their own id; **admin** any id. **Clients** should use "
-            "**openings** instead (this response may include client identifiers)."
-        ),
+        summary=PROVIDERS_SCHEDULE,
         parameters=[
-            OpenApiParameter(
-                name="from",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                required=True,
-                description="Inclusive range start (ISO 8601 datetime).",
-            ),
-            OpenApiParameter(
-                name="to",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                required=True,
-                description="Exclusive range end (ISO 8601 datetime).",
-            ),
+            OpenApiParameter(name="from", type=str, location=OpenApiParameter.QUERY, required=True),
+            OpenApiParameter(name="to", type=str, location=OpenApiParameter.QUERY, required=True),
         ],
     )
     @action(detail=True, methods=["get"], url_path="schedule")
@@ -119,25 +98,15 @@ class ServiceProviderViewSet(ModelViewSet):
 
     @extend_schema(
         tags=["Providers"],
-        summary="Suggested openings for one calendar day",
-        description=(
-            "For a given **date** (provider local calendar day), returns weekly windows, busy intervals, "
-            "and optional **suggested_starts** when `service` id is passed (15-minute grid; still validate on booking)."
-        ),
+        summary=PROVIDERS_OPENINGS,
         parameters=[
+            OpenApiParameter(name="date", type=str, location=OpenApiParameter.QUERY, required=True),
             OpenApiParameter(
-                name="date",
-                type=str,
-                location=OpenApiParameter.QUERY,
-                required=True,
-                description="Calendar day `YYYY-MM-DD` (interpreted in server timezone for window math).",
-            ),
-            OpenApiParameter(
-                name="service",
-                type=str,
+                name="duration",
+                type=int,
                 location=OpenApiParameter.QUERY,
                 required=False,
-                description="Service type id belonging to this provider; enables suggested start times.",
+                description="Appointment length in minutes (for suggested start times).",
             ),
         ],
     )
@@ -152,12 +121,13 @@ class ServiceProviderViewSet(ModelViewSet):
         if not on_date:
             raise ValidationError({"date": "Enter a valid date."})
 
-        service_duration = None
-        service_id = request.query_params.get("service")
-        if service_id:
-            svc = ServiceType.objects.filter(pk=service_id, provider=provider).first()
-            if svc is None:
-                raise ValidationError({"service": "No matching service for this provider."})
-            service_duration = svc.duration
+        duration_raw = request.query_params.get("duration")
+        slot_minutes = None
+        if duration_raw is not None:
+            if not str(duration_raw).isdigit() or int(duration_raw) <= 0:
+                raise ValidationError({"duration": "Enter a positive number of minutes."})
+            slot_minutes = int(duration_raw)
 
-        return Response(day_openings_payload(provider=provider, on_date=on_date, service_duration_minutes=service_duration))
+        return Response(
+            day_openings_payload(provider=provider, on_date=on_date, slot_minutes=slot_minutes)
+        )

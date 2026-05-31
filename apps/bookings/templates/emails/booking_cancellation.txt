@@ -1,0 +1,8 @@
+Hello,
+
+This appointment has been cancelled.
+
+{{ service_name }} with {{ provider_name }}
+Was scheduled for {{ when }}
+
+You can book a new time in the app.
