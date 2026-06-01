@@ -66,6 +66,18 @@ Render also sets `RENDER_EXTERNAL_HOSTNAME` automatically.
 
 ## Deploy on Render
 
+### Fix: `connection to localhost refused`
+
+Docker build succeeded but deploy failed because **`DATABASE_URL` is not set** on the web service.
+
+1. Render → **New** → **PostgreSQL**
+2. Web service → **Environment** → add **`DATABASE_URL`** (link from your Postgres — use Internal URL)
+3. Set `DEBUG=False`, `SECRET_KEY`, `CORS_ALLOWED_ORIGINS`
+4. **Manual Deploy**
+5. Check `https://YOUR-SERVICE.onrender.com/api/health/`
+
+**Alternatives:** [Railway](https://railway.app) (easiest), [Fly.io](https://fly.io), [PythonAnywhere](https://www.pythonanywhere.com)
+
 The build failed with **"Publish directory build does not exist"** because the service was created as a **Static Site**. This API must be a **Web Service**.
 
 ### Option A: Blueprint (recommended)

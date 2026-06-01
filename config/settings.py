@@ -1,8 +1,10 @@
 from datetime import timedelta
 from pathlib import Path
+import os
 
 import dj_database_url
 from decouple import config
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -24,6 +26,8 @@ if _render_host:
 CSRF_TRUSTED_ORIGINS = _csv(config("CSRF_TRUSTED_ORIGINS", default=""))
 if _render_host:
     CSRF_TRUSTED_ORIGINS.append(f"https://{_render_host}")
+
+_on_render = bool(_render_host or os.environ.get("RENDER") == "true")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -74,11 +78,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-_database_url = config("DATABASE_URL", default="").strip()
+_database_url = (config("DATABASE_URL", default="") or os.environ.get("DATABASE_URL", "")).strip()
 if _database_url:
     DATABASES = {
         "default": dj_database_url.parse(_database_url, conn_max_age=600),
     }
+elif _on_render:
+    raise ImproperlyConfigured(
+        "DATABASE_URL is missing. On Render: create a PostgreSQL database, "
+        "open your web service → Environment, and add DATABASE_URL from the database connection string."
+    )
 else:
     DATABASES = {
         "default": {
