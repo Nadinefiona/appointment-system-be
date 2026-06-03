@@ -182,6 +182,47 @@ BOOKING_DEFAULT_MINUTES = config("BOOKING_DEFAULT_MINUTES", default=60, cast=int
 BOOKING_REMINDER_HOURS = config("BOOKING_REMINDER_HOURS", default=24, cast=int)
 BOOKING_REMINDER_WINDOW_MINUTES = config("BOOKING_REMINDER_WINDOW_MINUTES", default=30, cast=int)
 
+# Celery (background tasks, e.g. email notifications).
+# If no broker is configured, tasks run eagerly (synchronously, in-process) so the
+# app still works locally and in tests without a running Redis/worker.
+CELERY_BROKER_URL = (
+    config("CELERY_BROKER_URL", default="") or os.environ.get("REDIS_URL", "")
+).strip()
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default="").strip() or None
+CELERY_TASK_ALWAYS_EAGER = not CELERY_BROKER_URL
+if CELERY_TASK_ALWAYS_EAGER:
+    # No real broker: use in-memory transport so eager tasks don't warn about localhost.
+    CELERY_BROKER_URL = "memory://"
+CELERY_TASK_EAGER_PROPAGATES = False
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
+CELERY_TIMEZONE = TIME_ZONE
+
+# Surface app logs and request errors to stdout/stderr so they appear in Render logs
+# (Django's default config hides console output when DEBUG=False).
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{levelname}] {asctime} {name}: {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "apps": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+}
+
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SESSION_COOKIE_SECURE = True

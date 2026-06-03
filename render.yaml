@@ -5,13 +5,22 @@ databases:
     user: appointment_user
 
 services:
+  # Redis: Celery broker for background email tasks.
+  # NOTE: Render Key Value/Redis and worker services may require a paid plan.
+  # If you stay on the free plan WITHOUT a worker, delete this redis block and the
+  # worker service below, and remove CELERY_BROKER_URL so emails send in-process.
+  - type: redis
+    name: appointment-redis
+    plan: free
+    ipAllowList: []
+    maxmemoryPolicy: noeviction
+
   - type: web
     name: appointment-system-be
     runtime: python
     plan: free
     buildCommand: ./build.sh
     startCommand: ./start.sh
-    healthCheckPath: /api/health/
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
@@ -23,8 +32,59 @@ services:
         fromDatabase:
           name: appointment-db
           property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: appointment-redis
+          type: redis
+          property: connectionString
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
       - key: CORS_ALLOWED_ORIGINS
         sync: false
+      - key: EMAIL_NOTIFICATIONS_ENABLED
+        value: "True"
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        sync: false
+      - key: EMAIL_HOST_PASSWORD
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false
+
+  # Celery worker: consumes the queue and actually sends the emails.
+  - type: worker
+    name: appointment-worker
+    runtime: python
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: celery -A config worker --loglevel=info --concurrency=2
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: appointment-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          name: appointment-redis
+          type: redis
+          property: connectionString
       - key: EMAIL_NOTIFICATIONS_ENABLED
         value: "True"
       - key: EMAIL_BACKEND

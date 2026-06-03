@@ -1,3 +1,5 @@
+import logging
+
 from drf_spectacular.utils import extend_schema, extend_schema_view
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -6,6 +8,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
+
+logger = logging.getLogger("apps.bookings")
 
 from .models import AvailabilitySlot, Booking
 from .serializers import (
@@ -165,6 +169,16 @@ class BookingViewSet(ModelViewSet):
             )
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
+        except Exception as exc:
+            logger.exception("Unexpected error creating booking for user %s", request.user)
+            return Response(
+                {
+                    "detail": "Booking could not be completed due to a server error.",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         output_serializer = BookingSerializer(booking, context=self.get_serializer_context())
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
@@ -177,4 +191,16 @@ class BookingViewSet(ModelViewSet):
             cancel_booking(booking=booking, actor=request.user)
         except ValueError as exc:
             raise ValidationError(str(exc)) from exc
+        except PermissionDenied:
+            raise
+        except Exception as exc:
+            logger.exception("Unexpected error cancelling booking %s", getattr(booking, "pk", None))
+            return Response(
+                {
+                    "detail": "Cancellation could not be completed due to a server error.",
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         return Response(self.get_serializer(booking).data)

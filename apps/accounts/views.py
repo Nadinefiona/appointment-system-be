@@ -9,9 +9,10 @@ from .serializers import RegisterSerializer
 
 
 @extend_schema_view(
-    post=extend_schema(tags=["Registration"], summary=REGISTER),
+    post=extend_schema(tags=["Registration"], summary=REGISTER, auth=[]),
 )
 class RegisterView(generics.CreateAPIView):
+    authentication_classes = []
     permission_classes = [AllowAny]
     serializer_class = RegisterSerializer
 

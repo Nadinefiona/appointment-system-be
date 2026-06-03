@@ -1,13 +1,13 @@
-# Line 1 = endpoint title (Swagger list). Line 2 = access (visible before expand).
+# Endpoint title shown in the Swagger list. The access role line is intentionally
+# omitted from the rendered summary.
 
 
-def endpoint(title, access):
-    return f"{title}\n{access}"
+def endpoint(title, access=""):
+    return title
 
 
 REGISTER = endpoint("Register client", "Access: public")
 LOGIN = endpoint("Login", "Access: public")
-REFRESH = endpoint("Refresh token", "Access: public")
 
 ME_GET = endpoint("My profile", "Access: client, provider, admin")
 ME_PATCH = endpoint("Update profile", "Access: client, provider, admin")

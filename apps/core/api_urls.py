@@ -4,7 +4,7 @@ from rest_framework.routers import DefaultRouter
 from apps.accounts.admin_views import AdminUserViewSet
 from apps.accounts.views import RegisterView
 from apps.bookings.views import AvailabilitySlotViewSet, BookingViewSet
-from apps.core.views import MeView, health
+from apps.core.views import MeView
 from apps.providers.views import ServiceProviderViewSet
 from apps.services.views import ServiceTypeViewSet
 
@@ -16,7 +16,6 @@ router.register("bookings", BookingViewSet, basename="booking")
 router.register("admin/users", AdminUserViewSet, basename="admin-user")
 
 urlpatterns = [
-    path("health/", health, name="health"),
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("me/", MeView.as_view(), name="me"),
 ] + router.urls
