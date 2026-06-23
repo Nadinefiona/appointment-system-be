@@ -1,12 +1,15 @@
 from datetime import timedelta
 from pathlib import Path
 import os
+import sys
 
 import dj_database_url
 from decouple import config
 from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+TESTING = "test" in sys.argv
 
 
 def _csv(value: str) -> list[str]:
@@ -175,7 +178,17 @@ EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="").strip()
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="").replace(" ", "").strip()
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=False, cast=bool)
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="").strip() or EMAIL_HOST_USER or "noreply@appointments.local"
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
+_from_address = (
+    config("DEFAULT_FROM_EMAIL", default="").strip() or EMAIL_HOST_USER or "noreply@appointments.local"
+)
+_from_name = config("DEFAULT_FROM_NAME", default="Appointment System").strip()
+# Show a friendly sender name (e.g. "Appointment System <you@gmail.com>") unless the
+# address already includes one.
+if _from_name and "<" not in _from_address:
+    DEFAULT_FROM_EMAIL = f"{_from_name} <{_from_address}>"
+else:
+    DEFAULT_FROM_EMAIL = _from_address
 EMAIL_FAIL_SILENTLY = config("EMAIL_FAIL_SILENTLY", default=False, cast=bool)
 
 BOOKING_DEFAULT_MINUTES = config("BOOKING_DEFAULT_MINUTES", default=60, cast=int)

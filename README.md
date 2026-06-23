@@ -4,7 +4,7 @@ Book appointments with service providers. Clients can browse providers and servi
 
 ## Live API
 
-Base URL: `https://appointment-system-be.onrender.com`
+Base URL: `https://appointment-system-be-kcux.onrender.com`
 
 Interactive docs (try every endpoint here): **`/api/docs/`**
 
@@ -22,7 +22,7 @@ In the docs page (`/api/docs/`), click **Authorize** and paste your token to try
 
 A confirmation email is sent automatically when you book, and a cancellation email when you cancel.
 
-## Run locally (optional)
+## Run locally
 
 ```bash
 python -m venv .venv
